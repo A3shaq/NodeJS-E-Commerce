@@ -1,74 +1,48 @@
-  
-var express = require('express');
-var path = require('path');
-var favicon = require('serve-favicon');
-var logger = require('morgan');
-var cookieParser = require('cookie-parser');
-var bodyParser = require('body-parser');
-var expressHbs = require('express-handlebars');
-var mongoose = require('mongoose');
-var session  = require('express-session');
-var passport = require('passport');
-var flash = require('connect-flash');
-var validator = require('express-validator');
-var MongoStore = require('connect-mongo')(session);
+const express = require('express');
+const bodyParser = require('body-parser');
+const mongoose = require('mongoose');
 
-var index = require('./routes/index');
-var userRoutes = require('./routes/user');
+const authRoutes = require('./routes/auth');
+const productRoutes = require('./routes/product');
+const categoryRoutes = require('./routes/category');
+const cartRoutes = require('./routes/cart');
 
-var app = express();
+const app = express();
 
-mongoose.connect('localhost:27017/shopping');
-require('./config/passport');
-
-// view engine setup
-app.engine('.hbs', expressHbs({defaultLayout: 'layout', extname: '.hbs'}));
-app.set('view engine', '.hbs');
-
-// uncomment after placing your favicon in /public
-//app.use(favicon(path.join(__dirname, 'public', 'favicon.ico')));
-app.use(logger('dev'));
 app.use(bodyParser.json());
-app.use(bodyParser.urlencoded({ extended: false }));
-app.use(validator());
-app.use(cookieParser());
-app.use(session({
-    secret: 'secret',
-    resave: false,
-    saveUninitialized: false,
-    store: new MongoStore({ mongooseConnection: mongoose.connection }),
-    cookie: {maxAge: 180 * 60 * 1000}
-}));
-app.use(flash());
-app.use(passport.initialize());
-app.use(passport.session());
-app.use(express.static(path.join(__dirname, 'public')));
 
-app.use(function(req, res, next) {
-   res.locals.login = req.isAuthenticated();
-   res.locals.session = req.session;
-   next();
+const MONGODB_URI =
+  'mongodb://localhost:27017/eCommerce';
+
+app.use((req, res, next) => {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'OPTIONS, GET, POST, PUT, PATCH, DELETE');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+    next();
 });
 
-app.use('/user', userRoutes);
-app.use('/', index);
+app.use('/auth', authRoutes);
+app.use('/product', productRoutes);
+app.use('/category', categoryRoutes);
+app.use('/cart', cartRoutes);
 
-// catch 404 and forward to error handler
-app.use(function(req, res, next) {
-  var err = new Error('Not Found');
-  err.status = 404;
-  next(err);
-});
+app.use((error, req, res, next) => {
+    console.log(error);
+    const status = error.statusCode || 500;
+    const message = error.message;
+    const data = error.data;
+    res.status(status).json({
+        message: message, data: data
+    });
+})
 
-// error handler
-app.use(function(err, req, res, next) {
-  // set locals, only providing error in development
-  res.locals.message = err.message;
-  res.locals.error = req.app.get('env') === 'development' ? err : {};
-
-  // render the error page
-  res.status(err.status || 500);
-  res.render('error');
-});
-
-module.exports = app;
+mongoose
+  .connect(
+    MONGODB_URI, { useNewUrlParser: true }
+  )
+  .then(result => {
+    app.listen(8080);
+  })
+  .catch(err => {
+    console.log(err);
+  });
